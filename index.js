@@ -2,14 +2,18 @@ const express = require("express");
 const cors = require("cors");
 const user = require("./db/user");
 const Product = require("./db/product");
-const cart = require("./db/carts");
+const Otherf = require("./db/otherfields");
+const Cart = require("./db/carts");
 const bcrypt = require("bcryptjs");
 const cookeparser = require("cookie-parser");
 const authentication = require("./middlewere/authentication");
 const dotenv = require("dotenv");
-const PORT = process.env.PORT || 5000
 
 // require("./db/config");
+dotenv.config({ path: "./config.env" });
+require("./connection/connect");
+const PORT = process.env.PORT;
+
 const app = express();
 app.use(cookeparser());
 app.use(express.json());
@@ -21,11 +25,6 @@ const path = require("path");
 const product = require("./db/product");
 
 app.use("/", express.static("image"));
-
-dotenv.config({ path: "./config.env" });
-require("./connection/connect");
-
-
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -123,7 +122,6 @@ app.post(
   async (req, res) => {
     try {
       if (req.verifytoken._id) {
-        // console.log(req.file);
         const file = req.file.filename;
         const { title, price, category } = req.body;
         res.send("verify");
@@ -136,13 +134,13 @@ app.post(
             file,
           });
           let result = await product.save();
-          console.log(result)
+          // console.log(result);
           res.send("data add done");
         } else {
           res.send("fill input");
         }
-      }else{
-        res.send("not verify")
+      } else {
+        res.send("not verify");
       }
     } catch (error) {
       console.log("erroradd");
@@ -151,15 +149,12 @@ app.post(
 );
 
 app.get("/products", async (req, res) => {
-  // if(req.verifytoken._id){
-  //   res.send("verify");
-    Product.find()
+  Product.find()
     .then((user) => res.json(user))
     .catch((err) => res.json(err));
-  // }else{
-  //   res.send("not verify")
-  // }
 });
+
+// category product API
 
 app.get("/headcg", async (req, res) => {
   Product.find({ category: "headphone" })
@@ -178,10 +173,12 @@ app.get("/speaker", async (req, res) => {
     .catch((err) => res.json(err));
 });
 app.get("/earbud", async (req, res) => {
-  Product.find({ category: "earbuds" })
+  Product.find({ category: "earbud" })
     .then((data) => res.json(data))
     .catch((err) => res.json(err));
 });
+
+// product delete API
 
 app.delete("/products/:id", async (req, res) => {
   const result = await Product.deleteOne({ _id: req.params.id });
@@ -205,34 +202,116 @@ app.get("/product/:id", async (req, res) => {
   }
 });
 
-// update api
+// get update product api
 
-app.get("/product/:id", async (req, res)=>{
-
-})
-
-// add to cart
-
-app.post("/cart-product/:id", async (req, res) => {
+app.get("/update-product/:id", async (req, res) => {
   try {
-    let Result = await Product.findOne({ _id: req.params.id });
-    let result = new Result({
-      title: title,
-      price: price,
-      category: category,
-      file: file,
-    });
-
-    result = await result.sa;
-
-    if (result) {
+    const result = await Product.findOne({ _id: req.params.id });
+    if (result._id) {
       res.send(result);
+      // console.log(result);
     } else {
-      console.warn("Product Not Found");
+      res.send("product not found");
     }
-  } catch (err) {
-    res.status(404).json({ message: "Product not Found" });
+  } catch (error) {
+    // console.log();
+    res.send("product not found");
   }
 });
+
+// update product API
+
+app.put("/update-products/:id", upload.single("file"), async (req, res) => {
+  console.log(req.file);
+  if (req.file) {
+    const result = await Product.updateOne(
+      { _id: req.params.id },
+      {
+        $set: {
+          title: req.body.title,
+          price: req.body.price,
+          category: req.body.category,
+          file: req.file.filename,
+        },
+      }
+    );
+
+    res.send(result);
+  } else {
+    const result = await Product.updateOne(
+      { _id: req.params.id },
+      {
+        $set: {
+          title: req.body.title,
+          price: req.body.price,
+          category: req.body.category,
+          // file: req.file.filename,
+        },
+      }
+    );
+    res.send(result);
+  }
+});
+
+// search product
+
+app.get("/search/:key", async (req, res) => {
+  const result = await Product.find({
+    $or: [{ title: { $regex: req.params.key } }],
+    // $or: [{ category: { $regex: req.params.key } }],
+  });
+  res.send(result);
+});
+
+// product add to cart
+
+app.get("/cart-product/:id", async (req, res) => {
+  try {
+    const result = await Product.findOne({ _id: req.params.id });
+    if (result._id) {
+      res.send(result);
+      // console.log(result);
+    } else {
+      res.send("product not found");
+    }
+  } catch (error) {
+    // console.log();
+    res.send("product not found");
+  }
+});
+
+app.post("/cart-product", upload.single("file"), async (req, res) => {
+  console.log(req.body);
+  // const file = req.file.filename;
+  // const { title, price, category } = req.body;
+
+  // if (title && price && category) {
+  //   let product = new Cart({
+  //     title,
+  //     price,
+  //     category,
+  //     // file,
+  //   });
+  //   let result = await product.save();
+  //   console.log(result);
+  //   res.send("data add done");
+  // } else {
+  //   res.send("fill input");
+  // }
+});
+
+// Other fields
+
+app.post("/otherf", async (req, res) => {
+  const { username, email, message } = req.body;
+  const other = new Otherf({ username, email, message });
+  const result = await other.save();
+  res.send(result);
+  console.log(result)
+});
+
+app.get("/contact", async (req, res) =>{
+  Otherf.find().then((resp) => res.send(resp))
+})
 
 app.listen(PORT);
